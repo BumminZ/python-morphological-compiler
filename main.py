@@ -1,38 +1,65 @@
 from src.morphological_lexer import MorphologicalLexer
-from src.result_analyzer import ResultsAnalyzer
-from src.testing_framework import TestingFramework
+from src.result_analyzer import ResultAnalyzer
 from src.validation_framework import ValidationFramework
+import sys
 
 
 def main():
     # Initialize components
     lexer = MorphologicalLexer()
-    test_framework = TestingFramework()
+    analyzer = ResultAnalyzer()
     validator = ValidationFramework()
-    analyzer = ResultsAnalyzer()
 
-    # Test code sample
-    test_code = """
-   def calculate_area(radius):
-       PI = 3.14159
-       return PI * radius ** 2
-   """
+    # Sample code
+    code = """
+    def processUserData(pre_processed_input):
+        MAX_RETRY_COUNT = 3
+        unvalidatedResult = 0
+        
+        for item in pre_processed_input:
+            if item > MAX_RETRY_COUNT:
+                continue
+            unvalidatedResult += processImplementation(item)
+        
+        return unvalidatedResult
+    """
 
-    # Process and analyze
-    tokens = lexer.tokenize(test_code)
-    results = test_framework.performance_test([test_code])
-    analysis = analyzer.analyze_performance(results)
-    validation = validator.validate_code(test_code)
+    # Perform lexical analysis
+    print("Performing lexical analysis...")
+    tokens = lexer.tokenize(code)
 
-    # Print results
+    # Display tokens
     print("\nTokens found:")
     for token in tokens:
-        print(f"Type: {token['type']}, Value: {
-              token['value']}, Position: {token['position']}")
+        if token.type == 'identifier':
+            print(f"\nIdentifier: {token.value}")
+            print(f"Convention: {token.convention}")
+            print(f"Morphemes: {token.morphemes}")
 
-    analyzer.format_results(analysis)
-    print("\nAnalysis Results:", analysis)
-    print("\nValidation Results:", validation)
+    # Analyze results
+    print("\nAnalyzing results...")
+    analysis = analyzer.analyze_tokens(tokens)
+    print("\nAnalysis results:")
+    for key, value in analysis.items():
+        print(f"{key}: {value}")
+
+    # Validate tokens
+    print("\nValidating tokens...")
+    validation_results = validator.validate_tokens(tokens)
+    print("\nValidation results:")
+    for rule, result in validation_results.items():
+        print(f"\n{rule}:")
+        print(f"Valid: {result['valid']}")
+        if not result['valid']:
+            print("Violations:")
+            for violation in result['violations']:
+                print(f"- {violation}")
+
+    # Display performance metrics
+    print("\nPerformance Metrics:")
+    metrics = lexer.get_metrics()
+    for metric, value in metrics.items():
+        print(f"{metric}: {value}")
 
 
 if __name__ == "__main__":

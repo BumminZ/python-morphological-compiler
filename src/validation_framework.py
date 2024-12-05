@@ -1,63 +1,84 @@
-from .morphological_lexer import MorphologicalLexer
+from typing import List, Dict
+from .morphological_lexer import Token
 
 
 class ValidationFramework:
     def __init__(self):
-        self.lexer = MorphologicalLexer()
-
-    def validate_code(self, code):
-        metrics = {
-            'syntax': self._validate_syntax(code),
-            'tokens': self._validate_tokens(self.lexer.tokenize(code)),
-            'linguistics': self._validate_linguistics(code)
-        }
-        return metrics
-
-    def _validate_syntax(self, code):
-        try:
-            compile(code, '<string>', 'exec')
-            return True
-        except SyntaxError:
-            return False
-
-    def _validate_tokens(self, tokens):
-        valid_tokens = 0
-        total_tokens = len(tokens)
-
-        for token in tokens:
-            if self._is_valid_token(token):
-                valid_tokens += 1
-
-        return valid_tokens / total_tokens if total_tokens > 0 else 0
-
-    def _is_valid_token(self, token):
-        return (
-            token['type'] in self.lexer.patterns and
-            token['value'] and
-            isinstance(token['position'], tuple) and
-            len(token['position']) == 2
-        )
-
-    def _validate_linguistics(self, code):
-        tokens = self.lexer.tokenize(code)
-        linguistic_validity = {
-            'naming_conventions': 0,
-            'morpheme_analysis': 0
+        self.validation_rules = {
+            'naming_convention': self._validate_naming_convention,
+            'morpheme_structure': self._validate_morpheme_structure,
+            'token_sequence': self._validate_token_sequence
         }
 
+    def validate_tokens(self, tokens: List[Token]) -> Dict:
+        """Validate tokens against all rules"""
+        results = {}
+        for rule_name, validator in self.validation_rules.items():
+            results[rule_name] = validator(tokens)
+        return results
+
+    def _validate_naming_convention(self, tokens: List[Token]) -> Dict:
+        """Validate naming conventions"""
+        violations = []
         for token in tokens:
-            if token['type'] == 'identifiers':
-                analysis = self.lexer.analyze_linguistics(token)
-                if analysis:
-                    linguistic_validity['naming_conventions'] += self._check_naming_convention(
-                        analysis)
-                    linguistic_validity['morpheme_analysis'] += self._check_morphemes(
-                        analysis)
+            if token.type == 'identifier':
+                if not self._is_valid_convention(token):
+                    violations.append({
+                        'token': str(token),
+                        'issue': 'Invalid naming convention'
+                    })
 
-        return linguistic_validity
+        return {
+            'valid': len(violations) == 0,
+            'violations': violations
+        }
 
-    def _check_naming_convention(self, analysis):
-        return 1 if analysis['pattern'] in ['snake_case', 'camelCase', 'PascalCase'] else 0
+    def _validate_morpheme_structure(self, tokens: List[Token]) -> Dict:
+        """Validate morpheme structure"""
+        violations = []
+        for token in tokens:
+            if token.type == 'identifier' and token.morphemes:
+                if not self._is_valid_morpheme_structure(token):
+                    violations.append({
+                        'token': str(token),
+                        'issue': 'Invalid morpheme structure'
+                    })
 
-    def _check_morphemes(self, analysis):
-        return 1 if analysis['morphemes']['root'] else 0
+        return {
+            'valid': len(violations) == 0,
+            'violations': violations
+        }
+
+    def _validate_token_sequence(self, tokens: List[Token]) -> Dict:
+        """Validate token sequence"""
+        violations = []
+        for i in range(len(tokens) - 1):
+            if not self._is_valid_sequence(tokens[i], tokens[i + 1]):
+                violations.append({
+                    'tokens': f"{tokens[i]} -> {tokens[i + 1]}",
+                    'issue': 'Invalid token sequence'
+                })
+
+        return {
+            'valid': len(violations) == 0,
+            'violations': violations
+        }
+
+    def _is_valid_convention(self, token: Token) -> bool:
+        """Check if token follows valid naming conventions"""
+        if token.convention == 'snake_case':
+            return '_' in token.value and token.value.islower()
+        elif token.convention == 'camelCase':
+            return token.value[0].islower() and not '_' in token.value
+        elif token.convention == 'PascalCase':
+            return token.value[0].isupper() and not '_' in token.value
+        return True
+
+    def _is_valid_morpheme_structure(self, token: Token) -> bool:
+        """Check if morpheme structure is valid"""
+        return len(token.morphemes) > 0
+
+    def _is_valid_sequence(self, token1: Token, token2: Token) -> bool:
+        """Check if token sequence is valid"""
+        # Add your sequence validation rules here
+        return True
