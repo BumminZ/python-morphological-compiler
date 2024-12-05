@@ -6,13 +6,6 @@
 pip install statistics
 ```
 
-### Usage
-```python
-from morphological_lexer import MorphologicalLexer
-lexer = MorphologicalLexer()
-tokens = lexer.tokenize("your_code_here")
-```
-
 ### Features
 - Token recognition
 - Pattern analysis
