@@ -1,5 +1,5 @@
 import time
-from morphological_lexer import MorphologicalLexer
+from .morphological_lexer import MorphologicalLexer
 from memory_profiler import memory_usage
 
 
