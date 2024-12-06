@@ -10,9 +10,21 @@ class TestMorphologicalLexer(unittest.TestCase):
         code = "def test_function():"
         tokens = self.lexer.tokenize(code)
 
-        self.assertEqual(len(tokens), 4)
-        self.assertEqual(tokens[0].type, 'keyword')
-        self.assertEqual(tokens[1].type, 'identifier')
+        # Let's verify each token individually
+        expected_tokens = [
+            ('keyword', 'def'),           # def
+            ('identifier', 'test_function'),  # test_function
+            ('delimiter', '('),           # (
+            ('delimiter', ')'),           # )
+            ('delimiter', ':')            # :
+        ]
+
+        self.assertEqual(len(tokens), 5)  # Updated to expect 5 tokens
+
+        # Verify each token matches expected type and value
+        for (token, (expected_type, expected_value)) in zip(tokens, expected_tokens):
+            self.assertEqual(token.type, expected_type)
+            self.assertEqual(token.value, expected_value)
 
     def test_identifier_morphemes(self):
         code = "calculateTotalValue"
