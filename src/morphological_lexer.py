@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from collections import defaultdict
@@ -5,28 +6,33 @@ import re
 import time
 import statistics
 import tracemalloc
+from datetime import datetime
 
 
 @dataclass
 class Token:
-    """Represents a token with its morphological properties"""
+    """Class representing a token with its properties"""
     type: str
     value: str
     start: int
     end: int
     morphemes: List[str] = field(default_factory=list)
     convention: str = None
+    line_number: int = 1
+    column: int = 0
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Token(type='{self.type}', value='{self.value}', morphemes={self.morphemes}, convention='{self.convention}')"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()
 
 
 class MorphologicalLexer:
+    """Lexical analyzer with morphological analysis capabilities"""
+
     def __init__(self):
-        # Initialize token patterns
+        # Token patterns
         self.patterns = {
             'keyword': r'\b(def|class|return|if|while|for|import|from|as)\b',
             'identifier': r'[a-zA-Z_][a-zA-Z0-9_]*',
@@ -37,122 +43,125 @@ class MorphologicalLexer:
             'whitespace': r'\s+'
         }
 
-        # Compile patterns for efficiency
+        # Compile patterns for performance
         self.compiled_patterns = {
             name: re.compile(pattern)
             for name, pattern in self.patterns.items()
         }
 
-        # Initialize morphological patterns
+        # Morpheme analysis configuration
         self.morpheme_patterns = {
             'prefix': ['un', 'pre', 'post', 'sub', 'super', 'inter'],
             'suffix': ['able', 'ible', 'er', 'or', 'tion', 'sion', 'ment'],
             'compound_separator': ['_', r'(?=[A-Z])']
         }
 
-        # Initialize common programming terms
-        self.common_terms = {
-            'implementation': True,
-            'process': True,
-            'validate': True,
-            'calculate': True,
-            'data': True,
-            'result': True,
-            'value': True,
-            'hook': True,
-            'function': True,
-            'test': True
-        }
-
-        # Initialize metrics
+        # Performance metrics
         self.metrics = defaultdict(list)
         self.token_count = 0
         self.error_count = 0
 
     def tokenize(self, code: str) -> List[Token]:
-        """Tokenize the input code and perform morphological analysis"""
+        """
+        Tokenize input code and perform morphological analysis.
+
+        Args:
+            code (str): Source code to analyze
+
+        Returns:
+            List[Token]: List of analyzed tokens
+        """
         tokens = []
-        pos = 0
+        position = 0
+        line = 1
+        column = 0
+
+        # Initialize performance monitoring
         start_time = time.time()
         tracemalloc.start()
 
-        while pos < len(code):
-            match_found = False
-
-            # Skip whitespace
-            if code[pos].isspace():
-                pos += 1
+        while position < len(code):
+            # Handle newlines
+            if code[position] == '\n':
+                line += 1
+                column = 0
+                position += 1
                 continue
 
-            # Try each pattern
+            # Skip whitespace
+            if code[position].isspace():
+                position += 1
+                column += 1
+                continue
+
+            # Try matching patterns
+            token = None
             for token_type, pattern in self.compiled_patterns.items():
                 if token_type == 'whitespace':
                     continue
 
-                match = pattern.match(code, pos)
+                match = pattern.match(code, position)
                 if match:
                     value = match.group(0)
                     token = Token(
                         type=token_type,
                         value=value,
-                        start=pos,
-                        end=pos + len(value)
+                        start=position,
+                        end=position + len(value),
+                        line_number=line,
+                        column=column
                     )
 
+                    # Perform morphological analysis for identifiers
                     if token_type == 'identifier':
                         token.morphemes = self._analyze_morphemes(value)
                         token.convention = self._detect_naming_convention(
                             value)
 
                     tokens.append(token)
-                    pos = match.end()
-                    match_found = True
+                    position = match.end()
+                    column += len(value)
                     break
 
-            if not match_found:
-                pos += 1
+            # Handle unrecognized characters
+            if not token:
+                position += 1
+                column += 1
                 self.error_count += 1
 
-        # Update metrics
-        end_time = time.time()
-        current, peak = tracemalloc.get_traced_memory()
+        # Update performance metrics
+        self._update_metrics(start_time)
         tracemalloc.stop()
-
-        self.metrics['processing_time'].append(end_time - start_time)
-        self.metrics['memory_usage'].append(current / 1024 / 1024)
-        self.metrics['peak_memory'].append(peak / 1024 / 1024)
         self.token_count += len(tokens)
 
         return tokens
 
     def _analyze_morphemes(self, identifier: str) -> List[str]:
-        """Break down an identifier into its morphological components"""
+        """
+        Analyze identifier into morphological components.
+
+        Args:
+            identifier (str): Identifier to analyze
+
+        Returns:
+            List[str]: List of identified morphemes
+        """
         if not identifier:
             return []
 
-        # Split on camelCase and snake_case boundaries
+        # Split on boundaries (camelCase and snake_case)
         parts = re.split('_|(?=[A-Z])', identifier)
-        parts = [p for p in parts if p]  # Remove empty strings
+        parts = [p for p in parts if p]
 
         if not parts:
             return [identifier]
 
         morphemes = []
-        current_part = ''
-
         for part in parts:
-            if not part:  # Skip empty parts
+            if not part:
                 continue
 
             part_lower = part.lower()
-
-            # Check if this is a common term (don't split it)
-            if part_lower in self.common_terms:
-                if current_part:
-                    morphemes.append(current_part)
-                    current_part = ''
-                morphemes.append(part)
-                continue
 
             # Check for prefixes
             prefix_found = False
@@ -164,25 +173,33 @@ class MorphologicalLexer:
                     prefix_found = True
                     break
 
-            # After prefix removal, check if remaining part is a common term
-            if part_lower in self.common_terms:
+            # Check for suffixes
+            suffix_found = False
+            for suffix in self.morpheme_patterns['suffix']:
+                if part_lower.endswith(suffix) and len(part) > len(suffix):
+                    remaining = part[:-len(suffix)]
+                    if remaining:
+                        morphemes.append(remaining)
+                    morphemes.append(suffix)
+                    suffix_found = True
+                    break
+
+            # Add remaining part if no suffix found
+            if not suffix_found and part:
                 morphemes.append(part)
-                continue
-
-            # If no special cases apply, add the part as is
-            if current_part:
-                morphemes.append(current_part)
-                current_part = ''
-            morphemes.append(part)
-
-        # Add any remaining part
-        if current_part:
-            morphemes.append(current_part)
 
         return morphemes
 
     def _detect_naming_convention(self, identifier: str) -> str:
-        """Detect the naming convention used in the identifier"""
+        """
+        Detect naming convention used in identifier.
+
+        Args:
+            identifier (str): Identifier to analyze
+
+        Returns:
+            str: Detected naming convention
+        """
         if not identifier:
             return None
 
@@ -200,8 +217,28 @@ class MorphologicalLexer:
             return 'camelCase'
         return 'lowercase'
 
+    def _update_metrics(self, start_time: float) -> None:
+        """
+        Update performance metrics.
+
+        Args:
+            start_time (float): Processing start time
+        """
+        end_time = time.time()
+        current, peak = tracemalloc.get_traced_memory()
+
+        self.metrics['processing_time'].append(end_time - start_time)
+        self.metrics['memory_usage'].append(
+            current / 1024 / 1024)  # Convert to MB
+        self.metrics['peak_memory'].append(peak / 1024 / 1024)  # Convert to MB
+
     def get_metrics(self) -> Dict:
-        """Return performance metrics"""
+        """
+        Get performance metrics.
+
+        Returns:
+            Dict: Dictionary of performance metrics
+        """
         if not self.metrics['processing_time']:
             return {}
 
